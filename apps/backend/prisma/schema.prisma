@@ -1,0 +1,272 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Conversation {
+  id     String @id @default(cuid())
+  userId String
+
+  lastAgentType AgentType?
+
+  agentsUsed AgentType[]
+
+  contextSummary  String? @db.Text
+  totalTokensUsed Int     @default(0)
+
+  title String?
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    MessageRole
+  content String      @db.Text
+
+  agentType AgentType?
+
+  toolCalls   Json?
+  toolResults Json?
+
+  tokenCount Int @default(0)
+
+  reasoning String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum AgentType {
+  ROUTER
+  SUPPORT
+  ORDER
+  BILLING
+  GENERAL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders    Orders[]
+  invoices  Invoice[]
+  refunds   Refund[]
+  addresses Address[]
+
+  @@index([email])
+}
+
+model Orders {
+  id          String @id @default(cuid())
+  orderNumber String @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  description String
+  price       Float
+
+  orderStatus    OrderStatus
+  deliveryStatus DeliveryStatus
+
+  addressId String
+  address   Address @relation(fields: [addressId], references: [id])
+
+  items    OrderItem[]
+  delivery Delivery?
+  invoices Invoice[]
+  refunds  Refund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([orderStatus])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Orders @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productName String
+  productSku  String
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+
+  @@index([orderId])
+}
+
+enum OrderStatus {
+  PROCESSING
+  REFUNDED
+  SUCCESS
+  FAILED
+  CANCELLED
+  RETURNED
+}
+
+enum DeliveryStatus {
+  PREPARING_TO_DISPATCH
+  DISPATCHED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  RETURNED
+  FAILED_DELIVERY
+}
+
+model Address {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  street   String
+  house    String
+  pincode  String
+  district String
+  state    String
+  country  String
+
+  isDefault Boolean @default(false)
+
+  orders    Orders[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Delivery {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Orders @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  trackingNumber String         @unique
+  carrier        String
+  status         DeliveryStatus
+
+  estimatedDate   DateTime
+  deliveredDate   DateTime?
+  currentLocation String?
+
+  trackingEvents Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([trackingNumber])
+}
+
+model Invoice {
+  id            String @id @default(cuid())
+  invoiceNumber String @unique
+
+  orderId String
+  order   Orders @relation(fields: [orderId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  amount Float
+  tax    Float @default(0)
+  total  Float
+
+  status InvoiceStatus
+
+  dueDate DateTime
+  paidAt  DateTime?
+
+  subscriptionId String?
+
+  paymentMethod String?
+  paymentRef    String?
+
+  pdfUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([invoiceNumber])
+  @@index([status])
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+model Refund {
+  id           String @id @default(cuid())
+  refundNumber String @unique
+
+  orderId String
+  order   Orders @relation(fields: [orderId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  amount Float
+  reason String       @db.Text
+  status RefundStatus
+
+  processedBy String?
+  notes       String? @db.Text
+
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
+  completedAt DateTime?
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+}
+
+enum RefundStatus {
+  REQUESTED
+  REVIEWING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
