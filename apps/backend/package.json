@@ -1,7 +1,10 @@
 {
   "name": "backend",
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "build": "bun tsc --noEmit",
+    "start": "bun run src/index.ts",
+    "typecheck": "bun tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",
